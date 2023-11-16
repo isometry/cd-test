@@ -1,0 +1,14 @@
+name: caller
+
+on:
+  push:
+    branches:
+      - develop
+      - staging
+      - canary
+
+jobs:
+  call_promote:
+    uses: ./.github/workflows/promote.yaml
+    with:
+      stages: '["develop", "staging:auto", "main"]'
