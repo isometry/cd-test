@@ -48,7 +48,7 @@ jobs:
               map.set(splitStage[0], splitStage[1] ? splitStage[1] === "auto" : false);
               return map;
             }, new Map());
-            console.log(`Stages map: ${JSON.stringify(stagesMap)}`)
+            console.log(`Stages map: ${JSON.stringify(Object.fromEntries(stagesMap))}`)
             const stagesArray = Array.from(stagesMap.keys());
             const sourceIndex = stagesArray.indexOf(sourceStage);
             if (sourceIndex === -1) {
@@ -72,11 +72,11 @@ jobs:
                 const newPR = await github.rest.pulls.create({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  title: `Promote ${sourceStage} to ${targetStage}${autoPromote ? " (auto)" : ""}}`,
+                  title: `Promote ${sourceStage} to ${targetStage}${autoPromote ? " (auto)" : ""}`,
                   head: sourceStage,
                   base: targetStage,
                 });
-                console.log(`Created PR: ${JSON.stringify(Object.fromEntries(newPR.data))}`)
+                console.log(`Created PR: ${JSON.stringify(newPR.data.url)}`)
               } else {
                 console.log(`Promotion PR already exists: ${JSON.stringify(openPRs.data[0].url)}`)
               }
