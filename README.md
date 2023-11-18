@@ -1,3 +1,3 @@
 # CD Promotion Testing
 
-Test promotion via merge.
+Test second promotion via merge.
