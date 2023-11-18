@@ -38,17 +38,36 @@ jobs:
             const targetIndex = (currentIndex !== -1 && currentIndex < stagesArray.length - 1 ) ? currentIndex + 1 : null;
             const targetStage = targetIndex !== null ? stagesArray[targetIndex] : null;
             const autoPromote = targetStage !== null ? stagesMap.get(targetStage) : false;
+            const prs = await github.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              base: targetStage,
+            });
+            const existingPR = prs.data.find(pr => pr.head.ref === triggerRef) ? true : false;
+            if (!existingPR && targetStage !== null) {
+              const newPR = await github.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Promote ${triggerRef} to ${targetStage}`,
+                head: triggerRef,
+                base: targetStage,
+              });
+              autoPromote && await github.pulls.createAutoMerge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: newPR.data.number,
+                merge_method: "squash",
+              });
+            }
             return {
               "triggerRef": triggerRef,
-              "stagesMap": Array.from(stagesMap.entries()),
-              "stagesArray": stagesArray,
               "currentIndex": currentIndex,
               "currentStage": currentStage,
               "targetIndex": targetIndex,
               "targetStage": targetStage,
               "autoPromote": autoPromote,
             };
-          debug: true
           # result-encoding: string
       - name: Get result
         run: echo "${{steps.calculate-promotion.outputs.result}}"
