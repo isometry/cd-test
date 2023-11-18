@@ -11,4 +11,5 @@ jobs:
   call_promote:
     uses: ./.github/workflows/promote.yaml
     with:
-      stages: '["develop", "staging:auto", "main"]'
+      stages: '["develop", "staging:auto", "canary", "main"]'
+      trigger_ref: "${{ github.ref }}"
