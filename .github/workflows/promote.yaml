@@ -53,21 +53,9 @@ jobs:
                 head: triggerRef,
                 base: targetStage,
               });
-              autoPromote && await github.pulls.createAutoMerge({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: newPR.data.number,
-                merge_method: "squash",
-              });
+              // cannot enable auto-merge via octokit
             }
-            return {
-              "triggerRef": triggerRef,
-              "currentIndex": currentIndex,
-              "currentStage": currentStage,
-              "targetIndex": targetIndex,
-              "targetStage": targetStage,
-              "autoPromote": autoPromote,
-            };
+            return autoPromote;
           # result-encoding: string
       - name: Get result
         run: echo "${{steps.calculate-promotion.outputs.result}}"
