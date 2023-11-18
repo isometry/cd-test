@@ -7,35 +7,85 @@ on:
         required: false
         type: string
         default: '["develop", "staging:auto", "canary", "main"]'
+      source:
+        required: true
+        type: string
 
 jobs:
   promote:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@v7
-        id: calculate-promotion
+        id: trigger-promotion
         env:
-          STAGES: ${{ toJson(fromJSON(inputs.stages)) }}
+          STAGES: "${{ toJSON(fromJSON(inputs.stages)) }}"
+          SOURCE: "${{ inputs.source }}"
         with:
-          github-token: "not-used"
           script: |
+            function updateStatus(state, message) {
+              console.log(`Updating commit status to ${state} with message ${message}`)
+              github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: context.sha,
+                state: state,
+                context: "continuous-delivery-pipeline",
+                description: message,
+              });
+            }
+            updateStatus("pending", "Calculating promotion path");
             const stages = JSON.parse(process.env.STAGES)
+            if (typeof stages === 'undefined'  || stages === null || !Array.isArray(stages)) {
+              updateStatus("failure", "Invalid stages");
+              return false;
+            }
+            let sourceStage = process.env.SOURCE
+            if (sourceStage.startsWith("refs/heads/"))
+              sourceStage = sourceStage.slice("refs/heads/".length);
+            console.log(`Source stage: ${sourceStage}`)
             const stagesMap = stages.reduce((map, stage) => {
               const splitStage = stage.split(":");
               map.set(splitStage[0], splitStage[1] ? splitStage[1] === "auto" : false);
               return map;
             }, new Map());
+            console.log(`Stages map: ${JSON.stringify(stagesMap)}`)
             const stagesArray = Array.from(stagesMap.keys());
-            const currentIndex = stagesArray.indexOf(github.ref_name);
-            const currentStage = stagesArray[currentIndex];
-            const targetIndex = (currentIndex !== -1 currentIndex < stagesArray.length - 1 ) ? currentIndex + 1 : null;
+            const sourceIndex = stagesArray.indexOf(sourceStage);
+            if (sourceIndex === -1) {
+              updateStatus("failure", `Source stage ${sourceStage} not found`);
+              return false;
+            }
+            const targetIndex = (sourceIndex !== -1 && sourceIndex < stagesArray.length - 1 ) ? sourceIndex + 1 : null;
             const targetStage = targetIndex !== null ? stagesArray[targetIndex] : null;
-            const autoPromote = targetStage !== null ? stagesMap.get(targetStage) : false;
-            return {
-              currentStage,
-              targetStage,
-              autoPromote
-            };
-          # result-encoding: string
+            console.log(`Target stage: ${targetStage}`)
+            if (targetStage !== null) {
+              const autoPromote = stagesMap.get(targetStage);
+              const openPRs = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: "open",
+                head: `${context.repo.owner}:${sourceStage}`,
+                base: targetStage,
+              });
+              console.log(`Open PRs: ${JSON.stringify(openPRs.data.map(pr => pr.url))}`)
+              if (openPRs.data.length === 0) {
+                const newPR = await github.rest.pulls.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: `Promote ${sourceStage} to ${targetStage}${autoPromote ? " (auto)" : ""}}`,
+                  head: sourceStage,
+                  base: targetStage,
+                });
+                console.log(`Created PR: ${JSON.stringify(Object.fromEntries(newPR.data))}`)
+              } else {
+                console.log(`Promotion PR already exists: ${JSON.stringify(openPRs.data[0].url)}`)
+              }
+              // TODO: cannot enable auto-merge via octokit
+              updateStatus("success", `Triggering promotion from ${sourceStage} to ${targetStage}${autoPromote ? " (auto)" : ""}`);
+              return autoPromote;
+            } else {
+              updateStatus("failure", `No target promotion stage found for ${sourceStage}`);
+            }
+            return false;
       - name: Get result
-        run: echo "${{steps.calculate-promotion.outputs.result}}"
+        run: echo "${{steps.trigger-promotion.outputs.result}}"
