@@ -28,7 +28,7 @@ jobs:
             const stagesArray = Array.from(stagesMap.keys());
             const currentIndex = stagesArray.indexOf(github.ref_name);
             const currentStage = stagesArray[currentIndex];
-            const targetIndex = (currentIndex !== -1 currentIndex < stagesArray.length - 1 ) ? currentIndex + 1 : null;
+            const targetIndex = (currentIndex !== -1 && currentIndex < stagesArray.length - 1 ) ? currentIndex + 1 : null;
             const targetStage = targetIndex !== null ? stagesArray[targetIndex] : null;
             const autoPromote = targetStage !== null ? stagesMap.get(targetStage) : false;
             return {
