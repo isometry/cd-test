@@ -21,7 +21,6 @@ jobs:
           STAGES: "${{ toJSON(fromJSON(inputs.stages)) }}"
           TRIGGER_REF: "${{ inputs.trigger_ref }}"
         with:
-          github-token: "not-used"
           script: |
             const stages = JSON.parse(process.env.STAGES)
             let triggerRef = process.env.TRIGGER_REF
@@ -33,29 +32,37 @@ jobs:
               return map;
             }, new Map());
             const stagesArray = Array.from(stagesMap.keys());
-            const currentIndex = stagesArray.indexOf(triggerRef);
-            const currentStage = stagesArray[currentIndex];
-            const targetIndex = (currentIndex !== -1 && currentIndex < stagesArray.length - 1 ) ? currentIndex + 1 : null;
+            const sourceIndex = stagesArray.indexOf(triggerRef);
+            const sourceStage = stagesArray[sourceIndex];
+            console.log(`Source stage: ${sourceStage}`)
+            const targetIndex = (sourceIndex !== -1 && sourceIndex < stagesArray.length - 1 ) ? sourceIndex + 1 : null;
             const targetStage = targetIndex !== null ? stagesArray[targetIndex] : null;
-            const autoPromote = targetStage !== null ? stagesMap.get(targetStage) : false;
-            const prs = await github.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: "open",
-              base: targetStage,
-            });
-            const existingPR = prs.data.find(pr => pr.head.ref === triggerRef) ? true : false;
-            if (!existingPR && targetStage !== null) {
-              const newPR = await github.pulls.create({
+            console.log(`Target stage: ${targetStage}`)
+            if (targetStage !== null) {
+              const autoPromote = stagesMap.get(targetStage);
+              const openPRs = await github.rest.pulls.list({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                title: `Promote ${triggerRef} to ${targetStage}`,
-                head: triggerRef,
+                state: "open",
+                head: "${context.repo.owner}:${sourceStage}",
                 base: targetStage,
               });
-              // cannot enable auto-merge via octokit
+              console.log(`Open PRs: ${JSON.stringify(openPRs.data)}`)
+              if (openPRs.data.length > 0) {
+                if (!openPRs.data.find(pr => pr.head.ref === triggerRef)) {
+                  const newPR = await github.rest.pulls.create({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    title: `Promote ${sourceStage} to ${targetStage}${autoPromote ? " (auto)" : ""}}`,
+                    head: sourceStage,
+                    base: targetStage,
+                  });
+                  console.log(`Created PR: ${JSON.stringify(newPR.data)}`)
+                }
+                // cannot enable auto-merge via octokit
+              }
+              return autoPromote;
             }
-            return autoPromote;
-          # result-encoding: string
+            return false;
       - name: Get result
         run: echo "${{steps.calculate-promotion.outputs.result}}"
