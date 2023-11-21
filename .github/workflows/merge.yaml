@@ -67,6 +67,8 @@ jobs:
             return (
               targetBranches.includes(pr.base.ref) &&
               pr.rebaseable &&
+              // clean: No conflicts, everything good. Merging is allowed (green box).
+              // unstable: Failing/pending commit status that is not part of the required status checks. Merging is allowed (yellow box).
               ["clean", "unstable"].includes(pr.mergeable_state)
             ) ? pr : false;
           result-encoding: json
@@ -100,8 +102,8 @@ jobs:
               repo: context.repo.repo,
               sha: context.sha,
               state: 'success',
-              context: "promoted-to-${pr.base.ref}",
-              description: "Promoted from ${pr.head.ref} to ${pr.base.ref}\n\n${pr.url}",
+              context: `promoted-to-${pr.base.ref}`,
+              description: `Promoted from ${pr.head.ref} to ${pr.base.ref}\n\n${pr.url}`,
             });
             return pr.base.ref;
           result-encoding: string
