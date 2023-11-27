@@ -6,22 +6,13 @@ permissions:
   statuses: write
 
 on:
-  pull_request:
-    branches: [staging, canary, main]
-    types:
-      - opened
-      - edited
-      - reopened
-
   pull_request_review:
-    types:
-      - submitted
+    types: [submitted]
   check_run:
-    types:
-      - completed
+    types: [completed]
   check_suite:
-    types:
-      - completed
+    types: [completed]
+  deployment_status: ~
   status: ~
 
 concurrency:
@@ -83,8 +74,8 @@ jobs:
       baseRef: ${{ fromJSON(needs.find-pr.outputs.result).base.ref }}
       headRef: ${{ fromJSON(needs.find-pr.outputs.result).head.ref }}
   request-promotion:
-    needs: [fast-forward-merge]
+    needs: [find-pr, fast-forward-merge]
     uses: ./.github/workflows/request-promotion.yaml
     with:
       stages: '["develop", "staging:auto", "canary", "main"]'
-      source: ${{ needs.fast-forward-merge.outputs.result }}
+      source: ${{ fromJSON(needs.find-pr.outputs.result).base.ref }}
