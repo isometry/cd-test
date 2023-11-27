@@ -1,0 +1,44 @@
+name: fast-forward-merge
+
+on:
+  workflow_call:
+    inputs:
+      headRef:
+        required: true
+        type: string
+      baseRef:
+        required: true
+        type: string
+      sha:
+        required: false
+        type: string
+        default: ${{ github.sha }}
+    outputs:
+      result:
+        description: The base ref that was fast-forwarded to the head ref
+        value: ${{ jobs.fast-forward-merge.outputs.result }}
+
+jobs:
+  fast-forward-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.baseRef }}
+          fetch-depth: 0 # fetch all history so that git merge --ff-only can work
+      - name: Merge PR and update promotion status
+        uses: actions/github-script@v7
+        id: merge
+        with:
+          script: |
+            console.log(`Fast-Forwarding ${inputs.baseRef} to ${inputs.sha} from ${inputs.headRef}`)
+
+            // Merge PR with --ff-only
+            await exec.exec('git', ['merge', '--ff-only', `origin/${inputs.headRef}`]);
+            await exec.exec('git', ['push', 'origin', inputs.baseRef]);
+
+            return inputs.baseRef;
+          result-encoding: string
+    outputs:
+      result: ${{ steps.merge.outputs.result }}
