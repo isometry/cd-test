@@ -1,38 +1,33 @@
-name: automerge
-
-permissions:
-  contents: write
-  pull-requests: write
-  statuses: write
+name: find-promotion-request
 
 on:
-  pull_request_review:
-    types: [submitted]
-  check_run:
-    types: [completed]
-  check_suite:
-    types: [completed]
-  deployment_status: ~
-  status: ~
-
-concurrency:
-  group: automerge
+  workflow_call:
+    inputs:
+      targetRefs:
+        required: false
+        type: string
+        default: '["staging", "canary", "production"]'
+    outputs:
+      result:
+        description: The PR that was found
+        value: ${{ jobs.find-promotion-request.outputs.result }}
 
 jobs:
-  find-pr:
+  find-promotion-request:
     runs-on: ubuntu-latest
     steps:
       - name: Find matching, mergeable PR
         uses: actions/github-script@v7
         id: find-pr
+        env:
+          TARGET_REFS: "${{ toJSON(fromJSON(inputs.targetRefs)) }}"
         with:
           script: |
             console.log(`Triggered by event name: ${context.eventName}`);
-            const isPullRequestEvent = ["pull_request", "pull_request_review"].includes(context.eventName);
-            const targetBranches = ["staging", "canary", "main"];
+            const targetRefs = JSON.parse(process.env.TARGET_REFS);
 
             let pr;
-            if (isPullRequestEvent) {
+            if (context.eventName === "pull_request_review") {
               pr = context.payload.pull_request;
             } else {
               const openPRs = await github.rest.pulls.list({
@@ -55,27 +50,15 @@ jobs:
             }
             console.log(`Found PR: ${pr.url}\nBase ref: ${pr.base.ref}; Head SHA: ${pr.head.sha}; Context SHA: ${context.sha}`);
             console.log(`Rebaseable: ${pr.rebaseable}; Mergeable state: ${pr.mergeable_state}`);
+            /* mergeable_state:
+            *  - clean:    No conflicts, everything good. Merging is allowed (green box).
+             * - unstable: Failing/pending commit status that is not part of the required status checks. Merging is allowed (yellow box).
+             */
             return (
-              targetBranches.includes(pr.base.ref) &&
+              targetRefs.includes(pr.base.ref) &&
               pr.rebaseable &&
-              // clean: No conflicts, everything good. Merging is allowed (green box).
-              // unstable: Failing/pending commit status that is not part of the required status checks. Merging is allowed (yellow box).
               ["clean", "unstable"].includes(pr.mergeable_state)
             ) ? pr : false;
           result-encoding: json
     outputs:
       result: ${{ steps.find-pr.outputs.result }}
-
-  fast-forward-merge:
-    needs: find-pr
-    if: ${{ fromJSON(needs.find-pr.outputs.result) != false }}
-    uses: ./.github/workflows/fast-forward-merge.yaml
-    with:
-      baseRef: ${{ fromJSON(needs.find-pr.outputs.result).base.ref }}
-      headRef: ${{ fromJSON(needs.find-pr.outputs.result).head.ref }}
-  request-promotion:
-    needs: [find-pr, fast-forward-merge]
-    uses: ./.github/workflows/request-promotion.yaml
-    with:
-      stages: '["develop", "staging:auto", "canary", "main"]'
-      source: ${{ fromJSON(needs.find-pr.outputs.result).base.ref }}

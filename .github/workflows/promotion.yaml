@@ -1,0 +1,53 @@
+name: promotion
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request_review:
+    types: [submitted]
+  check_run:
+    types: [completed]
+  check_suite:
+    types: [completed]
+  deployment_status: ~
+  status: ~
+
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: promotion
+
+jobs:
+  initiate:
+    if: ${{ github.event_name == 'push' }}
+    uses: ./.github/workflows/open-promotion-request.yaml
+    with:
+      stages: '["develop", "staging:auto", "canary", "main"]'
+      source: "${{ github.ref }}"
+
+  progress:
+    if: ${{ github.event_name != 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find Promotion Request
+        id: find
+        uses: ./.github/workflows/find-promotion-request.yaml
+        with:
+          targetRefs: '["staging", "canary", "main"]'
+      - name: Fast-Forward Merge
+        id: merge
+        if: ${{ fromJSON(steps.find.outputs.result) != false }}
+        uses: ./.github/workflows/fast-forward-merge.yaml
+        with:
+          baseRef: ${{ fromJSON(steps.find.outputs.result).base.ref }}
+          headRef: ${{ fromJSON(steps.find.outputs.result).head.ref }}
+      - name: Request Promotion
+        id: promote
+        uses: ./.github/workflows/open-promotion-request.yaml
+        with:
+          stages: '["develop", "staging:auto", "canary", "main"]'
+          source: ${{ fromJSON(steps.find.outputs.result).base.ref }}

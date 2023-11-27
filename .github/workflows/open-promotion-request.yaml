@@ -1,4 +1,4 @@
-name: request-promotion
+name: open-request-promotion
 
 on:
   workflow_call:
@@ -6,7 +6,7 @@ on:
       stages:
         required: false
         type: string
-        default: '["develop", "staging:auto", "canary", "main"]'
+        default: '["main", "staging:auto", "canary", "production"]'
       source:
         required: true
         type: string
@@ -20,7 +20,7 @@ on:
         default: "promotion"
 
 jobs:
-  promote:
+  open-promotion-request:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@v7
@@ -49,7 +49,7 @@ jobs:
               }
             }
             updateStatus("pending", "Calculating promotion path");
-            const stages = JSON.parse(process.env.STAGES)
+            const stages = JSON.parse(process.env.STAGES);
             if (typeof stages === 'undefined'  || stages === null || !Array.isArray(stages)) {
               updateStatus("failure", "Invalid stages");
               return false;
