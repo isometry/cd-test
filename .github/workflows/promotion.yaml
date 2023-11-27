@@ -23,31 +23,42 @@ concurrency:
 
 jobs:
   initiate:
+    name: Initiate Promotion
     if: ${{ github.event_name == 'push' }}
-    uses: ./.github/workflows/open-promotion-request.yaml
-    with:
-      stages: '["develop", "staging:auto", "canary", "main"]'
-      source: "${{ github.ref }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Request Promotion
+        uses: ./.github/actions/open-promotion-request
+        with:
+          stages: '["develop", "staging:auto", "canary", "main"]'
+          source: "${{ github.ref }}"
 
   progress:
+    name: Progress Promotion
     if: ${{ github.event_name != 'push' }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
       - name: Find Promotion Request
         id: find
-        uses: ./.github/workflows/find-promotion-request.yaml
+        uses: ./.github/actions/find-promotion-request
         with:
           targetRefs: '["staging", "canary", "main"]'
       - name: Fast-Forward Merge
         id: merge
-        if: ${{ fromJSON(steps.find.outputs.result) != false }}
-        uses: ./.github/workflows/fast-forward-merge.yaml
+        if: ${{ steps.find.outputs.found == 'true' }}
+        uses: ./.github/actions/fast-forward-merge
         with:
-          baseRef: ${{ fromJSON(steps.find.outputs.result).base.ref }}
-          headRef: ${{ fromJSON(steps.find.outputs.result).head.ref }}
+          baseRef: ${{ steps.find.outputs.baseRef }}
+          headRef: ${{ steps.find.outputs.headRef }}
       - name: Request Promotion
         id: promote
-        uses: ./.github/workflows/open-promotion-request.yaml
+        if: ${{ steps.find.outputs.found == 'true' }}
+        uses: ./.github/actions/open-promotion-request
         with:
           stages: '["develop", "staging:auto", "canary", "main"]'
-          source: ${{ fromJSON(steps.find.outputs.result).base.ref }}
+          source: ${{ steps.find.outputs.baseRef }}
