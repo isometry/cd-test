@@ -50,14 +50,14 @@ jobs:
           targetRefs: '["staging", "canary", "main"]'
       - name: Fast-Forward Merge
         id: merge
-        if: ${{ steps.find.outputs.found == 'true' }}
+        if: ${{ steps.find.outputs.promoteable == 'true' }}
         uses: ./.github/actions/fast-forward-merge
         with:
           baseRef: ${{ steps.find.outputs.baseRef }}
           headRef: ${{ steps.find.outputs.headRef }}
       - name: Request Promotion
         id: promote
-        if: ${{ steps.find.outputs.found == 'true' }}
+        if: ${{ steps.find.outputs.promoteable == 'true' }}
         uses: ./.github/actions/open-promotion-request
         with:
           stages: '["develop", "staging:auto", "canary", "main"]'

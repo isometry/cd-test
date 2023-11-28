@@ -19,7 +19,7 @@ async function run() {
 
   if (!pr) {
     console.log(`No PR found with head.sha ${headSha}`);
-    core.setOutput('found', false);
+    core.setOutput('promoteable', false);
     return;
   }
 
@@ -31,13 +31,13 @@ async function run() {
 
   if (isMergeable) {
     console.log(`Found mergeable PR: ${pr.number}; baseRef: ${pr.base.ref}; headRef: ${pr.head.ref} `);
-    core.setOutput('found', true);
+    core.setOutput('promoteable', true);
     core.setOutput('baseRef', pr.base.ref);
     core.setOutput('headRef', pr.head.ref);
     core.setOutput('prNumber', pr.number);
   } else {
     console.log(`Found non - mergeable PR: ${pr.number}; baseRef: ${pr.base.ref}; headRef: ${pr.head.ref} `);
-    core.setOutput('found', false);
+    core.setOutput('promoteable', false);
   }
 }
 

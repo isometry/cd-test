@@ -10,8 +10,8 @@ inputs:
     default: '["staging", "canary", "production"]'
     required: false
 outputs:
-  found:
-    description: Whether a PR was found
+  promoteable:
+    description: Whether a promoteable PR was found
   prNumber:
     description: The number of the PR
   headRef:

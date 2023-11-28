@@ -28950,7 +28950,7 @@ async function run() {
     }
     if (!pr) {
         console.log(`No PR found with head.sha ${headSha}`);
-        core.setOutput('found', false);
+        core.setOutput('promoteable', false);
         return;
     }
     console.log(`Fetching PR details for PR: ${pr.number}`);
@@ -28959,14 +28959,14 @@ async function run() {
     const isMergeable = targetRefs.includes(pr.base.ref) && pr.rebaseable && ['clean', 'unstable'].includes(pr.mergeable_state);
     if (isMergeable) {
         console.log(`Found mergeable PR: ${pr.number}; baseRef: ${pr.base.ref}; headRef: ${pr.head.ref} `);
-        core.setOutput('found', true);
+        core.setOutput('promoteable', true);
         core.setOutput('baseRef', pr.base.ref);
         core.setOutput('headRef', pr.head.ref);
         core.setOutput('prNumber', pr.number);
     }
     else {
         console.log(`Found non - mergeable PR: ${pr.number}; baseRef: ${pr.base.ref}; headRef: ${pr.head.ref} `);
-        core.setOutput('found', false);
+        core.setOutput('promoteable', false);
     }
 }
 run().catch(error => core.setFailed(error instanceof Error ? error.message : 'An unknown error occurred'));
