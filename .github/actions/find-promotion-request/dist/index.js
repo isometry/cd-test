@@ -28948,6 +28948,7 @@ async function run() {
             state: 'open',
         });
         console.log(`Found ${openPRs.length} open PRs: ${openPRs.map(pr => pr.url)}}`);
+        console.log(`Context: ${JSON.stringify(github_1.context)}`);
         const pr = openPRs.find(pr => pr.head.sha == github_1.context.sha);
         if (pr) {
             console.log(`Found PR: ${pr.number}; baseRef: ${pr.base.ref}; headRef: ${pr.head.ref}`);

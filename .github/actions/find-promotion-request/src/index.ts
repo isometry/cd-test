@@ -18,6 +18,7 @@ async function run() {
     });
 
     console.log(`Found ${openPRs.length} open PRs: ${openPRs.map(pr => pr.url)}}`)
+    console.log(`Context: ${JSON.stringify(context)}`)
 
     const pr = openPRs.find(pr => pr.head.sha == context.sha);
 
