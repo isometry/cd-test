@@ -28938,48 +28938,38 @@ const github_1 = __nccwpck_require__(6985);
 async function run() {
     const token = core.getInput('github-token', { required: true });
     const github = (0, github_1.getOctokit)(token);
-    try {
-        const targetRefs = JSON.parse(core.getInput('targetRefs'));
-        const { owner, repo } = github_1.context.repo;
-        console.log(`Finding PRs for ${owner}/${repo} with targetRefs: ${targetRefs}`);
-        const { data: openPRs } = await github.rest.pulls.list({
-            owner,
-            repo,
-            state: 'open',
-        });
-        console.log(`Found ${openPRs.length} open PRs: ${openPRs.map(pr => pr.url)}}`);
-        console.log(`Context: ${JSON.stringify(github_1.context)}`);
-        const pr = openPRs.find(pr => pr.head.sha == github_1.context.sha);
-        if (pr) {
-            console.log(`Found PR: ${pr.number}; baseRef: ${pr.base.ref}; headRef: ${pr.head.ref}`);
-            const { data: prDetails } = await github.rest.pulls.get({
-                owner,
-                repo,
-                pull_number: pr.number,
-            });
-            const isMergeable = targetRefs.includes(prDetails.base.ref) &&
-                prDetails.rebaseable &&
-                ['clean', 'unstable'].includes(prDetails.mergeable_state);
-            if (isMergeable) {
-                console.log(`Found mergeable PR: ${prDetails.number}; baseRef: ${prDetails.base.ref}; headRef: ${prDetails.head.ref}`);
-                core.setOutput('found', true);
-                core.setOutput('baseRef', prDetails.base.ref);
-                core.setOutput('headRef', prDetails.head.ref);
-                core.setOutput('prNumber', prDetails.number);
-                return;
-            }
-            console.log(`Found non-mergeable PR: ${prDetails.number}; baseRef: ${prDetails.base.ref}; headRef: ${prDetails.head.ref}`);
-            core.setOutput('found', false);
-            return;
-        }
-        console.log(`No PR found`);
+    const targetRefs = JSON.parse(core.getInput('targetRefs'));
+    const { owner, repo } = github_1.context.repo;
+    const headSha = github_1.context.payload.pull_request?.head.sha || github_1.context.sha;
+    let pr = github_1.context.payload.pull_request;
+    console.log(`Finding PRs for ${owner}/${repo} and head.sha ${headSha} with targetRefs: ${targetRefs}`);
+    if (!pr) {
+        const { data: openPRs } = await github.rest.pulls.list({ owner, repo, state: 'open' });
+        console.log(`Found ${openPRs.length} open PRs: ${openPRs.map(pr => pr.url)}`);
+        pr = openPRs.find(pr => pr.head.sha == headSha);
+    }
+    if (!pr) {
+        console.log(`No PR found with head.sha ${headSha}`);
+        core.setOutput('found', false);
+        return;
+    }
+    console.log(`Fetching PR details for PR: ${pr.number}`);
+    const { data } = await github.rest.pulls.get({ owner, repo, pull_number: pr.number });
+    pr = data;
+    const isMergeable = targetRefs.includes(pr.base.ref) && pr.rebaseable && ['clean', 'unstable'].includes(pr.mergeable_state);
+    if (isMergeable) {
+        console.log(`Found mergeable PR: ${pr.number}; baseRef: ${pr.base.ref}; headRef: ${pr.head.ref} `);
+        core.setOutput('found', true);
+        core.setOutput('baseRef', pr.base.ref);
+        core.setOutput('headRef', pr.head.ref);
+        core.setOutput('prNumber', pr.number);
+    }
+    else {
+        console.log(`Found non - mergeable PR: ${pr.number}; baseRef: ${pr.base.ref}; headRef: ${pr.head.ref} `);
         core.setOutput('found', false);
     }
-    catch (error) {
-        core.setFailed(error instanceof Error ? error.message : 'An unknown error occurred');
-    }
 }
-run();
+run().catch(error => core.setFailed(error instanceof Error ? error.message : 'An unknown error occurred'));
 
 
 /***/ }),

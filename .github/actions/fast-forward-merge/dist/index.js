@@ -25966,26 +25966,14 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(2657));
 const exec = __importStar(__nccwpck_require__(9042));
 async function run() {
-    try {
-        const baseRef = core.getInput('baseRef');
-        const headRef = core.getInput('headRef');
-        console.log(`Fast-Forwarding ${baseRef} to ${headRef}`);
-        // Merge PR with --ff-only
-        await exec.exec('git', ['switch', baseRef]);
-        await exec.exec('git', ['merge', '--ff-only', `origin/${headRef}`]);
-        await exec.exec('git', ['push', 'origin', baseRef]);
-        return;
-    }
-    catch (error) {
-        if (error instanceof Error) {
-            core.setFailed(error.message);
-        }
-        else {
-            core.setFailed('An unknown error occurred');
-        }
-    }
+    const baseRef = core.getInput('baseRef');
+    const headRef = core.getInput('headRef');
+    console.log(`Fast-Forwarding ${baseRef} to ${headRef}`);
+    await exec.exec('git', ['switch', baseRef]);
+    await exec.exec('git', ['merge', '--ff-only', `origin/${headRef}`]);
+    await exec.exec('git', ['push', 'origin', baseRef]);
 }
-run();
+run().catch(error => core.setFailed(error instanceof Error ? error.message : 'An unknown error occurred'));
 
 
 /***/ }),

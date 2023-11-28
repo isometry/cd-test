@@ -28938,68 +28938,59 @@ const github_1 = __nccwpck_require__(6985);
 async function run() {
     const token = core.getInput('github-token', { required: true });
     const github = (0, github_1.getOctokit)(token);
-    try {
-        const stages = JSON.parse(core.getInput('stages'));
-        const source = core.getInput('source');
-        const statusContext = core.getInput('context');
-        console.log(`Stages: ${stages}; Source: ${source}`);
-        const updateStatus = async (state, message) => {
-            console.log(`Updating commit status to ${state} with message ${message}`);
-            github.rest.repos.createCommitStatus({
-                owner: github_1.context.repo.owner,
-                repo: github_1.context.repo.repo,
-                sha: github_1.context.sha,
-                context: statusContext,
-                state: state,
-                description: message,
-            });
-        };
-        const sourceStage = source.replace("refs/heads/", "");
-        updateStatus("pending", "Calculating promotion path");
-        const stagesMap = stages.reduce((map, stage) => {
-            const [stageName, autoPromote] = stage.split(":");
-            map[stageName] = autoPromote === "auto";
-            return map;
-        }, {});
-        const stagesArray = Object.keys(stagesMap);
-        const sourceIndex = stagesArray.indexOf(sourceStage);
-        if (sourceIndex === -1 || sourceIndex === stagesArray.length - 1) {
-            await updateStatus("failure", `Source stage ${sourceStage} not found or no target stage`);
-            core.setOutput('result', false);
-            return;
-        }
-        const targetStage = stagesArray[sourceIndex + 1];
-        const autoPromote = stagesMap[targetStage];
-        console.log(`Target stage: ${targetStage}`);
-        const { data: openPRs } = await github.rest.pulls.list({
+    const stages = JSON.parse(core.getInput('stages'));
+    const source = core.getInput('source');
+    const statusContext = core.getInput('context');
+    const sourceStage = source.replace("refs/heads/", "");
+    const updateStatus = async (state, message) => {
+        console.log(`Updating commit status to ${state} with message ${message}`);
+        await github.rest.repos.createCommitStatus({
             owner: github_1.context.repo.owner,
             repo: github_1.context.repo.repo,
-            state: "open",
-            head: `${github_1.context.repo.owner}:${sourceStage}`,
+            sha: github_1.context.sha,
+            context: statusContext,
+            state: state,
+            description: message,
+        });
+    };
+    const stagesMap = stages.reduce((map, stage) => {
+        const [stageName, autoPromote] = stage.split(":");
+        map[stageName] = autoPromote === "auto";
+        return map;
+    }, {});
+    const stagesArray = Object.keys(stagesMap);
+    const sourceIndex = stagesArray.indexOf(sourceStage);
+    if (sourceIndex === -1 || sourceIndex === stagesArray.length - 1) {
+        await updateStatus("failure", `Source stage ${sourceStage} not found or no target stage`);
+        core.setOutput('result', false);
+        return;
+    }
+    const targetStage = stagesArray[sourceIndex + 1];
+    const autoPromote = stagesMap[targetStage];
+    const { data: openPRs } = await github.rest.pulls.list({
+        owner: github_1.context.repo.owner,
+        repo: github_1.context.repo.repo,
+        state: "open",
+        head: `${github_1.context.repo.owner}:${sourceStage}`,
+        base: targetStage,
+    });
+    if (openPRs.length === 0) {
+        const { data: newPR } = await github.rest.pulls.create({
+            owner: github_1.context.repo.owner,
+            repo: github_1.context.repo.repo,
+            title: `Promote ${sourceStage} to ${targetStage}${autoPromote ? " (auto)" : ""}`,
+            head: sourceStage,
             base: targetStage,
         });
-        console.log(`Open PRs: ${JSON.stringify(openPRs.map(pr => pr.url))}`);
-        if (openPRs.length === 0) {
-            const { data: newPR } = await github.rest.pulls.create({
-                owner: github_1.context.repo.owner,
-                repo: github_1.context.repo.repo,
-                title: `Promote ${sourceStage} to ${targetStage}${autoPromote ? " (auto)" : ""}`,
-                head: sourceStage,
-                base: targetStage,
-            });
-            console.log(`Created Promotion Request: ${JSON.stringify(newPR.url)}`);
-        }
-        else {
-            console.log(`Promotion Request already exists: ${JSON.stringify(openPRs[0].url)}`);
-        }
-        await updateStatus("success", `Opened promotion request from ${sourceStage} to ${targetStage}${autoPromote ? " (auto)" : ""}`);
-        core.setOutput('result', autoPromote);
+        console.log(`Created PR: ${newPR.url}`);
     }
-    catch (error) {
-        core.setFailed(error instanceof Error ? error.message : 'An unknown error occurred');
+    else {
+        console.log(`Existing PR: ${openPRs[0].url}`);
     }
+    await updateStatus("success", `Opened promotion request from ${sourceStage} to ${targetStage}${autoPromote ? " (auto)" : ""}`);
+    core.setOutput('result', autoPromote);
 }
-run();
+run().catch(error => core.setFailed(error instanceof Error ? error.message : 'An unknown error occurred'));
 
 
 /***/ }),
